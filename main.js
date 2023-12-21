@@ -1,40 +1,27 @@
 import redisClient from "./utils/redis";
 import dbClient from "./utils/db";
 
-// (async () => {
-// 	console.log(redisClient.isAlive());
-// 	console.log(await redisClient.get("myKey"));
-// 	await redisClient.set("myKey", 12, 5);
-// 	console.log(await redisClient.get("myKey"));
-
-// 	setTimeout(async () => {
-// 		console.log(await redisClient.get("myKey"));
-// 	}, 1000 * 10);
-// })();
-
-const waitConnection = () => {
-	return new Promise((resolve, reject) => {
-		let i = 0;
-		const repeatFct = async () => {
-			await setTimeout(() => {
-				i += 1;
-				if (i >= 10) {
-					reject();
-				} else if (!dbClient.isAlive()) {
-					repeatFct();
-				} else {
-					resolve();
-				}
-			}, 1000);
-		};
-		repeatFct();
-	});
+const waitConnection = async (maxRetries = 10, retryInterval = 1000) => {
+    for (let i = 0; i < maxRetries; i++) {
+        await new Promise(resolve => setTimeout(resolve, retryInterval));
+        if (dbClient.isAlive()) {
+            return;
+        }
+    }
+    throw new Error("Database connection not established within the specified time.");
 };
 
-(async () => {
-	console.log(dbClient.isAlive());
-	await waitConnection();
-	console.log(dbClient.isAlive());
-	console.log(await dbClient.nbUsers());
-	console.log(await dbClient.nbFiles());
-})();
+const main = async () => {
+    console.log(`Redis Client: ${redisClient.isAlive()}`);
+    
+    try {
+        await waitConnection();
+        console.log(`Database Client: ${dbClient.isAlive()}`);
+        console.log(`Number of Users: ${await dbClient.nbUsers()}`);
+        console.log(`Number of Files: ${await dbClient.nbFiles()}`);
+    } catch (error) {
+        console.error(error.message);
+    }
+};
+
+main();
